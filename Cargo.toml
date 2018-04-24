@@ -1,0 +1,10 @@
+[package]
+name = "truckio_server"
+version = "0.1.0"
+authors = ["schneki <schneki@protonmail.com>"]
+
+[dependencies]
+ws = "*"
+serde = "*"
+serde_derive = "*"
+serde_json = "*"
