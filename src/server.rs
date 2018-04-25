@@ -22,7 +22,7 @@ impl Handler for Server {
         let client = Client{id: self.out.connection_id(),
             x:0.0, z:0.0, angle:0.0,
             speed: 0.1,
-            rotation_speed: 0.03,
+            rotation_speed: 0.01,
             keys: Keys{left:false,right:false, boost:false}};
         let json = json!({"t": "client", "id": self.out.connection_id(), 
             "data": &client});

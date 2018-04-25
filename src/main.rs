@@ -43,7 +43,7 @@ fn main() {
                                 unlock_sender.clone(), clients_arc.clone());
 
     let server = thread::spawn(move || {
-      listen("127.0.0.1:5012", |out: Sender| {
+      listen("0.0.0.0:5012", |out: Sender| {
           server::Server{ out: out, 
               open_sender: open_sender.clone(),
               close_sender: close_sender.clone(),
