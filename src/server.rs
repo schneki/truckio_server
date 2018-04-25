@@ -20,7 +20,10 @@ impl Handler for Server {
     fn on_open(&mut self, shake: Handshake) -> Result<()> {
         println!("Client connected");
         let client = Client{id: self.out.connection_id(),
-            x:0.0, z:0.0, angle:0.0, keys: Keys{left:false,right:false}};
+            x:0.0, z:0.0, angle:0.0,
+            speed: 0.1,
+            rotation_speed: 0.03,
+            keys: Keys{left:false,right:false, boost:false}};
         let json = json!({"t": "client", "id": self.out.connection_id(), 
             "data": &client});
         self.open_sender.send(client).unwrap();
