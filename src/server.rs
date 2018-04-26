@@ -4,6 +4,8 @@ use ws::{Handshake, listen, CloseCode, Handler, Message, Result, Sender};
 use std::sync::{Arc, Mutex};
 use std::sync::mpsc;
 use serde_json;
+use util;
+
 
 use client_handler::{Client, Keys};
 
@@ -16,14 +18,18 @@ pub struct Server {
     pub output_receiver: Arc<Mutex<mpsc::Receiver<String>>>,
 }
 
+
 impl Handler for Server {
     fn on_open(&mut self, shake: Handshake) -> Result<()> {
         println!("Client connected");
         let client = Client{id: self.out.connection_id(),
             x:0.0, z:0.0, angle:0.0,
             speed: 0.1,
+            temp_counter: 0,
             rotation_speed: 0.01,
-            keys: Keys{left:false,right:false, boost:false}};
+            creation_time: util::time_millis(),
+            update_time: util::time_millis(),
+            keys: Keys{id: self.out.connection_id(), left:false,right:false, boost:false}};
         let json = json!({"t": "client", "id": self.out.connection_id(), 
             "data": &client});
         self.open_sender.send(client).unwrap();
@@ -35,14 +41,12 @@ impl Handler for Server {
         let t = json["t"].as_str().unwrap();
         match t {
             "move" => {
-                println!("on_message: move");
                 let keys: Keys = serde_json::from_str(&json["data"].to_string()).unwrap();
                 let json = json!({"t":"move", "id": self.out.connection_id(), 
                     "data": &keys});;
                 self.move_sender.send((self.out.connection_id(), keys)).unwrap();
 
-                self.out.broadcast(json.to_string()).unwrap();  
-                Ok(())
+                self.out.broadcast(json.to_string())
             },
             "client_list" => {
                 self.client_list_sender.send(()).unwrap();
@@ -51,6 +55,7 @@ impl Handler for Server {
 
                 let clients_json = output_receiver.recv().unwrap() as String;
                 let mut clients: HashMap<u32, Client> = serde_json::from_str(&clients_json).unwrap();
+                clients.remove(&self.out.connection_id());
                 self.out.send(json!({"t":"client_list", 
                     "id": self.out.connection_id(), "data": clients}).to_string())
             },

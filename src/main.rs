@@ -11,12 +11,15 @@ use std::thread;
 use std::time::Duration;
 
 
+mod util;
 mod server;
 mod client_handler;
 mod game_loop;
 mod event_handler;
+mod update_loop;
 
 use client_handler::{Client, client_movement};
+
 
 
 fn main() {
@@ -42,8 +45,14 @@ fn main() {
     event_handler::close_handler(close_receiver, lock_sender.clone(), 
                                 unlock_sender.clone(), clients_arc.clone());
 
+
     let server = thread::spawn(move || {
       listen("0.0.0.0:5012", |out: Sender| {
+          update_loop::start(out.clone(), 
+                             lock_sender.clone(), 
+                             unlock_sender.clone(),
+                             clients_arc.clone());
+
           server::Server{ out: out, 
               open_sender: open_sender.clone(),
               close_sender: close_sender.clone(),
