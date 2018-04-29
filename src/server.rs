@@ -6,68 +6,36 @@ use std::sync::mpsc;
 use serde_json;
 use util;
 
+use map_handler::Map;
 
-use client_handler::{Client, Keys};
+
+use client::{Client, Keys};
+use game_loop;
 
 pub struct Server {
     pub out: Sender,
-    pub open_sender: mpsc::Sender<Client>,
-    pub close_sender: mpsc::Sender<u32>,
-    pub move_sender: mpsc::Sender<(u32, Keys)>,
-    pub client_list_sender: mpsc::Sender<()>,
-    pub output_receiver: Arc<Mutex<mpsc::Receiver<String>>>,
+    pub map: Map,
+    pub message_sender: mpsc::Sender<game_loop::Message>,
 }
 
 
 impl Handler for Server {
     fn on_open(&mut self, shake: Handshake) -> Result<()> {
         println!("Client connected");
-        let client = Client{id: self.out.connection_id(),
-            x:0.0, z:0.0, angle:0.0,
-            speed: 0.1,
-            temp_counter: 0,
-            rotation_speed: 0.01,
-            creation_time: util::time_millis(),
-            update_time: util::time_millis(),
-            keys: Keys{id: self.out.connection_id(), left:false,right:false, boost:false}};
-        let json = json!({"t": "client", "id": self.out.connection_id(), 
-            "data": &client});
-        self.open_sender.send(client).unwrap();
-        self.out.broadcast(json.to_string())
+        self.message_sender.send(game_loop::Message::new(
+                self.out.connection_id(), 0, "".into(), self.out.clone()))
+            .unwrap();
+        Ok(())
     }
 
     fn on_message(&mut self, msg: Message) -> Result<()> {
-        let json: serde_json::Value = serde_json::from_str(msg.as_text().unwrap()).unwrap();
-        let t = json["t"].as_str().unwrap();
-        match t {
-            "move" => {
-                let keys: Keys = serde_json::from_str(&json["data"].to_string()).unwrap();
-                let json = json!({"t":"move", "id": self.out.connection_id(), 
-                    "data": &keys});;
-                self.move_sender.send((self.out.connection_id(), keys)).unwrap();
-
-                self.out.broadcast(json.to_string())
-            },
-            "client_list" => {
-                self.client_list_sender.send(()).unwrap();
-                let output_receiver_mutex = self.output_receiver.clone();
-                let output_receiver = output_receiver_mutex.lock().unwrap();
-
-                let clients_json = output_receiver.recv().unwrap() as String;
-                let mut clients: HashMap<u32, Client> = serde_json::from_str(&clients_json).unwrap();
-                clients.remove(&self.out.connection_id());
-                self.out.send(json!({"t":"client_list", 
-                    "id": self.out.connection_id(), "data": clients}).to_string())
-            },
-            _ => {
-                self.out.send(json!({"t":"nothing", 
-                    "id": self.out.connection_id()}).to_string())
-            }
-        }
+        self.message_sender.send(game_loop::Message::new(
+                self.out.connection_id(), 1, msg.as_text().unwrap().into(), self.out.clone())).unwrap();
+        Ok(())
     }
 
     fn on_close(&mut self, code: CloseCode, reason: &str) {
-        self.close_sender.send(self.out.connection_id()).unwrap();
-        self.out.broadcast(json!({"t":"close", "id": self.out.connection_id()}).to_string()).unwrap();
+        self.message_sender.send(game_loop::Message::new(
+                self.out.connection_id(), 2, "".into(), self.out.clone())).unwrap();
     }
 }
